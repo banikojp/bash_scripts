@@ -55,12 +55,15 @@ echo "サイズ範囲: ${MIN_SIZE}KB - ${MAX_SIZE}KB"
 echo "出力ディレクトリ: $OUTPUT_DIR"
 
 # ファイルの作成
-for i in $(seq -w 1 $NUM_FILES); do
+for ((i=1; i<=NUM_FILES; i++)); do
     # ランダムなサイズを生成（バイト単位）
     size=$(( (RANDOM % (MAX_SIZE - MIN_SIZE + 1) + MIN_SIZE) * 1024 ))
     
+    # ファイル名の生成（4桁の数字にパディング）
+    filename=$(printf "random_file_%04d.bin" $i)
+    
     # ファイルの作成
-    dd if=/dev/urandom of="$OUTPUT_DIR/random_file_${i}.bin" bs=1 count=$size status=none
+    dd if=/dev/urandom of="$OUTPUT_DIR/$filename" bs=1 count=$size status=none
     
     # 進捗表示（10ファイルごと）
     if [ $((i % 10)) -eq 0 ]; then
