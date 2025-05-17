@@ -78,7 +78,8 @@ for ((i=1; i<=NUM_FILES; i++)); do
     
     # テキストファイルの作成
     {
-        while [ $(stat -f %z "$OUTPUT_DIR/$filename" 2>/dev/null || echo 0) -lt $size ]; do
+        current_size=0
+        while [ $current_size -lt $size ]; do
             # ランダムな行数を生成（1-10行）
             lines=$((RANDOM % 10 + 1))
             
@@ -92,6 +93,8 @@ for ((i=1; i<=NUM_FILES; i++)); do
                     line+="$word "
                 done
                 echo "$line"
+                # 現在のサイズを更新
+                current_size=$((current_size + ${#line} + 1))  # +1 for newline
             done
         done
     } > "$OUTPUT_DIR/$filename"
