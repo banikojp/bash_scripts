@@ -10,7 +10,7 @@ OUTPUT_DIR="random_text_files"
 WORDS=(
     "こんにちは" "世界" "プログラミング" "シェルスクリプト" "Linux"
     "システム" "ファイル" "データ" "テキスト" "ランダム"
-    "生成" "処理" "実行" "開発" "テスト"
+    "生成する" "処理する" "実行する" "開発する" "テストする"
     "環境" "設定" "変数" "関数" "コマンド"
     "エラー" "成功" "完了" "開始" "終了"
     "情報" "警告" "デバッグ" "ログ" "出力"
@@ -18,6 +18,7 @@ WORDS=(
     "作成" "更新" "変更" "確認" "検証"
     "最適化" "改善" "修正" "調整" "設定"
     "管理" "運用" "保守" "監視" "制御"
+    "分析" "評価" "計画" "設計" "実装"
 )
 
 # ヘルプメッセージの表示
@@ -61,6 +62,27 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# 入力値の検証
+if ! [[ "$NUM_FILES" =~ ^[1-9][0-9]*$ ]]; then
+    echo "エラー: ファイル数は正の整数である必要があります。"
+    exit 1
+fi
+
+if ! [[ "$MIN_SIZE" =~ ^[1-9][0-9]*$ ]]; then
+    echo "エラー: 最小ファイルサイズは正の整数である必要があります。"
+    exit 1
+fi
+
+if ! [[ "$MAX_SIZE" =~ ^[1-9][0-9]*$ ]]; then
+    echo "エラー: 最大ファイルサイズは正の整数である必要があります。"
+    exit 1
+fi
+
+if [ "$MIN_SIZE" -gt "$MAX_SIZE" ]; then
+    echo "エラー: 最小ファイルサイズは最大ファイルサイズ以下である必要があります。"
+    exit 1
+fi
+
 # 出力ディレクトリの作成
 mkdir -p "$OUTPUT_DIR"
 
@@ -77,27 +99,80 @@ for ((i=1; i<=NUM_FILES; i++)); do
     filename=$(printf "random_text_%04d.txt" $i)
     
     # テキストファイルの作成
-    {
-        current_size=0
-        while [ $current_size -lt $size ]; do
-            # ランダムな行数を生成（1-10行）
-            lines=$((RANDOM % 10 + 1))
-            
-            # 各行にランダムな単語を配置
-            for ((j=0; j<lines; j++)); do
-                # ランダムな単語数を生成（1-5単語）
-                words=$((RANDOM % 5 + 1))
-                line=""
-                for ((k=0; k<words; k++)); do
-                    word=${WORDS[$((RANDOM % ${#WORDS[@]}))]}
-                    line+="$word "
-                done
-                echo "$line"
-                # 現在のサイズを更新
-                current_size=$((current_size + ${#line} + 1))  # +1 for newline
+    # size はターゲットサイズ（バイト単位）
+    FILE_CONTENT="" 
+
+    if [ "$size" -eq 0 ]; then
+        touch "$OUTPUT_DIR/$filename"
+    else
+        # CURRENT_BYTE_SIZE_OF_FILE_CONTENT_AS_ECHOED は、`echo "$FILE_CONTENT"` を実行した場合のバイトサイズを追跡します。
+        CURRENT_BYTE_SIZE_OF_FILE_CONTENT_AS_ECHOED=0
+
+        while true; do
+            # 1. 新しい候補行のテキストを生成 (NEW_LINE_TEXT、末尾の改行なし)
+            NUM_WORDS_IN_LINE=$((RANDOM % 5 + 1))
+            NEW_LINE_TEXT=""
+            for ((k=0; k<NUM_WORDS_IN_LINE; k++)); do
+                WORD=${WORDS[$((RANDOM % ${#WORDS[@]}))]}
+                NEW_LINE_TEXT+="$WORD "
             done
+            NEW_LINE_TEXT=${NEW_LINE_TEXT% } # 末尾のスペースを削除
+
+            # 2. NEW_LINE_TEXT が追加された場合の予測バイトサイズを計算
+            PROSPECTIVE_BYTE_SIZE=0
+            if [ -z "$FILE_CONTENT" ]; then # FILE_CONTENT が現在空の場合
+                if [ -z "$NEW_LINE_TEXT" ]; then # NEW_LINE_TEXT も空の場合
+                    PROSPECTIVE_BYTE_SIZE=1 # echo "" | wc -c は 1 (改行のみのため)
+                else
+                    PROSPECTIVE_BYTE_SIZE=$(echo "$NEW_LINE_TEXT" | wc -c)
+                fi
+            else # FILE_CONTENT に既存のテキストがある場合
+                # (FILE_CONTENT + \n + NEW_LINE_TEXT) をエコーした場合のサイズを計算
+                PROSPECTIVE_BYTE_SIZE=$(echo "$FILE_CONTENT"$'\n'"$NEW_LINE_TEXT" | wc -c)
+            fi
+
+            # 3. 判断ロジック
+            # ケース A: 最初の行で、かつ、その行だけでサイズを超える場合
+            if [ -z "$FILE_CONTENT" ] && [ $PROSPECTIVE_BYTE_SIZE -gt $size ]; then
+                if [ $size -gt 0 ]; then
+                    # 最初の行が大きすぎる場合、ファイルが空でないことだけを保証します。
+                    # 大きすぎる行を書き込む代わりに、FILE_CONTENTを空のままにしておき、
+                    # ループ後のロジックで1バイトのファイル(改行のみ)を作成するようにします。
+                    FILE_CONTENT="" 
+                fi
+                break # ループを終了
+            fi
+
+            # ケース B: NEW_LINE_TEXT を追加すると目標サイズを超える場合
+            if [ $PROSPECTIVE_BYTE_SIZE -gt $size ]; then
+                break # この NEW_LINE_TEXT は追加しません。現在の FILE_CONTENT が最適です。
+            fi
+
+            # ケース C: NEW_LINE_TEXT を受け入れる
+            if [ -z "$FILE_CONTENT" ]; then
+                FILE_CONTENT="$NEW_LINE_TEXT"
+            else
+                FILE_CONTENT+=$'\n'"$NEW_LINE_TEXT"
+            fi
+            CURRENT_BYTE_SIZE_OF_FILE_CONTENT_AS_ECHOED=$PROSPECTIVE_BYTE_SIZE
+
+            # ケース D: 目標サイズに完全に一致した場合
+            if [ $CURRENT_BYTE_SIZE_OF_FILE_CONTENT_AS_ECHOED -eq $size ]; then
+                break
+            fi
         done
-    } > "$OUTPUT_DIR/$filename"
+
+        # 4. 蓄積された内容を実際のファイルに書き込む
+        if [ -n "$FILE_CONTENT" ]; then
+            echo "$FILE_CONTENT" > "$OUTPUT_DIR/$filename"
+        elif [ $size -gt 0 ]; then
+            # FILE_CONTENT は空のままだが、目標サイズが0より大きい場合。
+            # (例: 最初の NEW_LINE_TEXT が空で、ループがすぐに終了した場合など)
+            # 少なくとも1バイトのファイルを作成するために改行のみを書き込みます。
+            echo > "$OUTPUT_DIR/$filename"
+        fi
+        # sizeが0の場合は、既に上で touch で処理済みです。
+    fi
     
     # 進捗表示（10ファイルごと）
     if [ $((i % 10)) -eq 0 ]; then

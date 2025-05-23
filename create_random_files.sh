@@ -47,6 +47,27 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# 入力値の検証
+if ! [[ "$NUM_FILES" =~ ^[1-9][0-9]*$ ]]; then
+    echo "エラー: ファイル数は正の整数である必要があります。"
+    exit 1
+fi
+
+if ! [[ "$MIN_SIZE" =~ ^[1-9][0-9]*$ ]]; then
+    echo "エラー: 最小ファイルサイズは正の整数である必要があります。"
+    exit 1
+fi
+
+if ! [[ "$MAX_SIZE" =~ ^[1-9][0-9]*$ ]]; then
+    echo "エラー: 最大ファイルサイズは正の整数である必要があります。"
+    exit 1
+fi
+
+if [ "$MIN_SIZE" -gt "$MAX_SIZE" ]; then
+    echo "エラー: 最小ファイルサイズは最大ファイルサイズ以下である必要があります。"
+    exit 1
+fi
+
 # 出力ディレクトリの作成
 mkdir -p "$OUTPUT_DIR"
 
@@ -63,7 +84,10 @@ for ((i=1; i<=NUM_FILES; i++)); do
     filename=$(printf "random_file_%04d.bin" $i)
     
     # ファイルの作成
-    dd if=/dev/urandom of="$OUTPUT_DIR/$filename" bs=1 count=$size status=none
+    dd if=/dev/urandom of="$OUTPUT_DIR/$filename" bs=1 count=$size
+    if [ $? -ne 0 ]; then
+        echo "エラー: ファイル '$filename' の作成に失敗しました。"
+    fi
     
     # 進捗表示（10ファイルごと）
     if [ $((i % 10)) -eq 0 ]; then
